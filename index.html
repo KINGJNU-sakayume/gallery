@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>움짤 서랍</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="움짤 서랍">
+<meta name="theme-color" content="#0E0E10">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADs0lEQVR4nO3dMVIcRxiG4UblmFKoFJNRBDrNhlzDduLAie1rONRpVCoVmaTUx3CwZReF+bSzC9v9d/M8IRB0z7zzM+xuMReXl28bPOXN6AVQlziIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIH0Q+jF9C+fbkfvYTnurq+Gb2Es7gY+BivBbJ4aL1ExsSxWBYPrZTIgHuOhctoa+2udxwrHbtkmT12jWOZo3bQGjv1pyxRvzjWuJi2W2C/JgdRpzgWuIxOMPuuTQ4icZzXbnc3egmnE8fZ7XZ3kyYijk5m7EMc/UzXhzi6mqsPcRCJo7eJhoc4iMQxwCzDQxxE4hjj9vb97e370as4QBwjFU9EHOOV7UMcJdTsQxxVFOxDHETiKKTa8BAHkThqKTU8xEEkDiJxEImDSBxE4iAa/z/BZvTb31///8Vf3/3YfyVnJY7jPJnFw2+tlIhfK0f4ThlH/cwsxLHV9rO+TB/i2OTY871GH+I47LQzvUAf4iASxwHPGQCzDw9xEImDSBxE4iASB5E4iMRxwHPeSJv9TThxEInjsNMGwOxjo4ljo2PP9AJltG5xLPDks+3n+7+f/OmXP862nB5MjiNs6WONmbHX72OCV9c3sz9iov177rd8hnT2sdF8hvQ0K42H7+j6a2WBO4+NFhgbrf89x2voY40y2pAb0rX7WKaMNuqeY9/HAvenD62Uxd7IG9Kr65vd7u7P338euIYXsV4We+P/Wln1yC5g8ItgHz78NXYBQ9zffxq9hE28Qko0Po7XNjxmGRutQhyUVSKO1zM8JhobrUgc7XX0MVcZrU4cbfU+piujtXZxefl29Boem+URaBsdm8Xnzx/Ps5CjVYxjb4FETpsWdeIY/wppMuMcXkyhe45H6lxAPZXadd04GK50HKUuow6q7bd0HIxVPY5qF9P5FNxp9ThayaP24mrucYI4WtVj91LK7q7ui2BPKvUItOcrm8XeZHHsLZBI8Sz2poyDPua452AIcRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB9E/TNS3QVb5QakAAAAASUVORK5CYII=">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAADs0lEQVR4nO3dMVIcRxiG4UblmFKoFJNRBDrNhlzDduLAie1rONRpVCoVmaTUx3CwZReF+bSzC9v9d/M8IRB0z7zzM+xuMReXl28bPOXN6AVQlziIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIH0Q+jF9C+fbkfvYTnurq+Gb2Es7gY+BivBbJ4aL1ExsSxWBYPrZTIgHuOhctoa+2udxwrHbtkmT12jWOZo3bQGjv1pyxRvzjWuJi2W2C/JgdRpzgWuIxOMPuuTQ4icZzXbnc3egmnE8fZ7XZ3kyYijk5m7EMc/UzXhzi6mqsPcRCJo7eJhoc4iMQxwCzDQxxE4hjj9vb97e370as4QBwjFU9EHOOV7UMcJdTsQxxVFOxDHETiKKTa8BAHkThqKTU8xEEkDiJxEImDSBxE4iAa/z/BZvTb31///8Vf3/3YfyVnJY7jPJnFw2+tlIhfK0f4ThlH/cwsxLHV9rO+TB/i2OTY871GH+I47LQzvUAf4iASxwHPGQCzDw9xEImDSBxE4iASB5E4iMRxwHPeSJv9TThxEInjsNMGwOxjo4ljo2PP9AJltG5xLPDks+3n+7+f/OmXP862nB5MjiNs6WONmbHX72OCV9c3sz9iov177rd8hnT2sdF8hvQ0K42H7+j6a2WBO4+NFhgbrf89x2voY40y2pAb0rX7WKaMNuqeY9/HAvenD62Uxd7IG9Kr65vd7u7P338euIYXsV4We+P/Wln1yC5g8ItgHz78NXYBQ9zffxq9hE28Qko0Po7XNjxmGRutQhyUVSKO1zM8JhobrUgc7XX0MVcZrU4cbfU+piujtXZxefl29Boem+URaBsdm8Xnzx/Ps5CjVYxjb4FETpsWdeIY/wppMuMcXkyhe45H6lxAPZXadd04GK50HKUuow6q7bd0HIxVPY5qF9P5FNxp9ThayaP24mrucYI4WtVj91LK7q7ui2BPKvUItOcrm8XeZHHsLZBI8Sz2poyDPua452AIcRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB5E4iMRBJA4icRCJg0gcROIgEgeROIjEQSQOInEQiYNIHETiIBIHkTiIxEEkDiJxEImDSBxE4iASB9E/TNS3QVb5QakAAAAASUVORK5CYII=">
+<style>
+  :root{
+    --ink:#0E0E10;
+    --surface:#17171A;
+    --surface-2:#202025;
+    --line:rgba(255,255,255,.09);
+    --text:#EDEBE6;
+    --muted:#8A8A93;
+    --motion:#6FD3C4;
+    --danger:#E4695F;
+    --gap:2px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--ink);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Segoe UI",system-ui,sans-serif;
+    font-size:15px;line-height:1.45;
+    overscroll-behavior-y:none;
+    -webkit-user-select:none;user-select:none;
+  }
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:20;
+    padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    background:rgba(14,14,16,.82);backdrop-filter:saturate(160%) blur(18px);
+    -webkit-backdrop-filter:saturate(160%) blur(18px);
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:10px;
+  }
+  .wordmark{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  .count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .topbar .spacer{flex:1}
+  .textbtn{font-size:14px;color:var(--motion);padding:4px 2px}
+  .textbtn.plain{color:var(--muted)}
+
+  /* ---------- grid ---------- */
+  .grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);
+    padding:var(--gap) var(--gap) 120px;
+  }
+  @media (min-width:520px){ .grid{grid-template-columns:repeat(4,1fr)} }
+  @media (min-width:820px){ .grid{grid-template-columns:repeat(6,1fr)} }
+  .tile{
+    position:relative;aspect-ratio:1;background:var(--surface);overflow:hidden;
+    display:block;border:0;padding:0;
+  }
+  .tile img{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .dot{
+    position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;
+    background:var(--motion);box-shadow:0 0 0 2px rgba(0,0,0,.35);
+  }
+  .tile .name{
+    position:absolute;left:0;right:0;bottom:0;padding:14px 6px 5px;
+    font-size:10px;line-height:1.2;color:rgba(255,255,255,.9);
+    background:linear-gradient(to top,rgba(0,0,0,.72),transparent);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    opacity:0;transition:opacity .18s;
+  }
+  body.editing .tile .name{opacity:1}
+  .tile .check{
+    position:absolute;left:6px;bottom:6px;width:20px;height:20px;border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.85);background:rgba(0,0,0,.28);
+    display:none;align-items:center;justify-content:center;
+  }
+  body.editing .tile .check{display:flex}
+  .tile[aria-pressed="true"] .check{background:var(--motion);border-color:var(--motion)}
+  .tile[aria-pressed="true"] img{transform:scale(.9);transition:transform .12s}
+  .tile .check svg{width:12px;height:12px;stroke:#0E0E10;stroke-width:2.6;fill:none;display:none}
+  .tile[aria-pressed="true"] .check svg{display:block}
+
+  /* ---------- empty state ---------- */
+  .empty{
+    padding:16vh 30px 0;text-align:center;color:var(--muted);
+  }
+  .empty h2{color:var(--text);font-size:17px;margin:0 0 8px;font-weight:600;letter-spacing:-.01em}
+  .empty p{margin:0 auto;max-width:300px;font-size:13.5px;line-height:1.6}
+  .empty .frames{
+    width:74px;height:74px;margin:0 auto 22px;position:relative;
+  }
+  .empty .frames i{
+    position:absolute;border-radius:9px;border:1.5px solid var(--line);background:var(--surface);
+  }
+  .empty .frames i:nth-child(1){inset:16px 0 0 16px}
+  .empty .frames i:nth-child(2){inset:8px 8px 8px 8px;background:var(--surface-2)}
+  .empty .frames i:nth-child(3){inset:0 16px 16px 0;background:#2A2A31;border-color:rgba(255,255,255,.16)}
+  .empty .frames b{
+    position:absolute;left:26px;top:24px;width:12px;height:12px;border-radius:50%;background:var(--motion)
+  }
+
+  /* ---------- dock ---------- */
+  .dock{
+    position:fixed;left:0;right:0;bottom:0;z-index:20;
+    padding:10px 14px calc(env(safe-area-inset-bottom) + 12px);
+    background:linear-gradient(to top,var(--ink) 55%,rgba(14,14,16,0));
+    display:flex;gap:10px;align-items:center;
+  }
+  .primary{
+    flex:1;height:46px;border-radius:14px;background:var(--text);color:#0E0E10;
+    font-weight:650;font-size:15px;letter-spacing:-.01em;
+    display:flex;align-items:center;justify-content:center;gap:7px;
+  }
+  .primary:active{opacity:.75}
+  .ghost{
+    height:46px;padding:0 16px;border-radius:14px;background:var(--surface-2);
+    border:1px solid var(--line);font-size:14px;color:var(--text);
+  }
+  .ghost.danger{color:var(--danger)}
+  .ghost:disabled{opacity:.35}
+
+  /* ---------- progress ---------- */
+  .toast{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:40;
+    background:rgba(32,32,37,.95);border:1px solid var(--line);
+    padding:9px 16px;border-radius:999px;font-size:13px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    opacity:0;pointer-events:none;transition:opacity .2s;
+    max-width:80vw;text-align:center;
+  }
+  .toast.show{opacity:1}
+
+  /* ---------- viewer ---------- */
+  .viewer{
+    position:fixed;inset:0;z-index:60;background:#000;
+    display:none;flex-direction:column;
+  }
+  .viewer.open{display:flex}
+  .stage{
+    flex:1;position:relative;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  .stage img{
+    max-width:100%;max-height:100%;display:block;object-fit:contain;
+    -webkit-user-drag:none;
+  }
+  .vchrome{transition:opacity .2s}
+  .viewer.hidechrome .vchrome{opacity:0;pointer-events:none}
+  .vtop{
+    position:absolute;top:0;left:0;right:0;z-index:2;
+    padding:calc(env(safe-area-inset-top) + 12px) 16px 26px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.75),transparent);
+    display:flex;align-items:flex-start;gap:12px;
+  }
+  .vmeta{min-width:0;flex:1}
+  .vmeta .t{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vmeta .s{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px}
+  .iconbtn{
+    width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);
+    display:flex;align-items:center;justify-content:center;flex:none;
+  }
+  .iconbtn svg{width:16px;height:16px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .vbottom{
+    position:absolute;bottom:0;left:0;right:0;z-index:2;
+    padding:26px 16px calc(env(safe-area-inset-bottom) + 16px);
+    background:linear-gradient(to top,rgba(0,0,0,.75),transparent);
+    display:flex;align-items:center;justify-content:center;gap:26px;
+  }
+  .nav{
+    position:absolute;top:0;bottom:0;width:22%;z-index:1;
+  }
+  .nav.prev{left:0} .nav.next{right:0}
+
+  /* ---------- sheet ---------- */
+  .sheet{
+    position:fixed;inset:0;z-index:70;display:none;
+    align-items:flex-end;background:rgba(0,0,0,.55);
+  }
+  .sheet.open{display:flex}
+  .sheet .card{
+    width:100%;background:var(--surface);border-top-left-radius:20px;border-top-right-radius:20px;
+    border-top:1px solid var(--line);
+    padding:20px 20px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  .sheet h3{margin:0 0 10px;font-size:16px;letter-spacing:-.01em}
+  .sheet p{margin:0 0 16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+  .sheet .row{display:flex;gap:10px}
+  .sheet .row button{flex:1;height:46px;border-radius:13px;font-size:15px}
+  .sheet .row .cancel{background:var(--surface-2);border:1px solid var(--line)}
+  .sheet .row .confirm{background:var(--danger);color:#fff;font-weight:600}
+  .kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .kv:last-of-type{border-bottom:0}
+  .kv span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  :focus-visible{outline:2px solid var(--motion);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wordmark">움짤 서랍</div>
+  <div class="count" id="count"></div>
+  <div class="spacer"></div>
+  <button class="textbtn plain" id="infoBtn">정보</button>
+  <button class="textbtn" id="editBtn">편집</button>
+</header>
+
+<div class="empty" id="empty" hidden>
+  <div class="frames"><i></i><i></i><i></i><b></b></div>
+  <h2>아직 담긴 파일이 없어요</h2>
+  <p>아래 <b>파일 담기</b>로 WebP를 골라 넣으면 이 서랍에 남습니다. 다음부터는 고를 필요 없이 바로 열려요.</p>
+</div>
+
+<main class="grid" id="grid"></main>
+
+<footer class="dock">
+  <button class="primary" id="addBtn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    파일 담기
+  </button>
+  <button class="ghost danger" id="deleteBtn" hidden disabled>삭제</button>
+</footer>
+
+<input type="file" id="picker" multiple accept="image/webp,image/gif,image/apng,image/png,image/avif,.webp,.gif,.avif" hidden>
+
+<div class="toast" id="toast"></div>
+
+<!-- viewer -->
+<div class="viewer" id="viewer">
+  <div class="stage" id="stage">
+    <img id="vimg" alt="">
+    <div class="nav prev" id="navPrev"></div>
+    <div class="nav next" id="navNext"></div>
+    <div class="vtop vchrome">
+      <div class="vmeta">
+        <div class="t" id="vname"></div>
+        <div class="s" id="vsub"></div>
+      </div>
+      <button class="iconbtn" id="shareBtn" aria-label="공유">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4M12 4L8 8M12 4l4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+      </button>
+      <button class="iconbtn" id="closeBtn" aria-label="닫기">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="vbottom vchrome">
+      <button class="iconbtn" id="prevBtn" aria-label="이전">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="iconbtn" id="replayBtn" aria-label="처음부터 재생">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+      <button class="iconbtn" id="nextBtn" aria-label="다음">
+        <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- sheet -->
+<div class="sheet" id="sheet">
+  <div class="card" id="sheetCard"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============ IndexedDB ============ */
+const DB_NAME = "webp-shelf", STORE = "items", VER = 1;
+let dbp = null;
+function db(){
+  if(dbp) return dbp;
+  dbp = new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, VER);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if(!d.objectStoreNames.contains(STORE)){
+        d.createObjectStore(STORE, { keyPath: "id" }).createIndex("addedAt", "addedAt");
+      }
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbp;
+}
+async function tx(mode, fn){
+  const d = await db();
+  return new Promise((res, rej) => {
+    const t = d.transaction(STORE, mode);
+    const out = fn(t.objectStore(STORE));
+    t.oncomplete = () => res(out);
+    t.onerror = () => rej(t.error);
+    t.onabort = () => rej(t.error);
+  });
+}
+const dbAll    = () => tx("readonly",  s => { const r = s.getAll(); return new Promise(ok => r.onsuccess = () => ok(r.result)); }).then(p => p);
+const dbPut    = rec => tx("readwrite", s => s.put(rec));
+const dbDelete = id  => tx("readwrite", s => s.delete(id));
+
+/* ============ state ============ */
+let items = [];                 // {id,name,size,type,addedAt,w,h,animated,blob,thumb}
+const thumbURLs = new Map();
+const sel = new Set();
+let editing = false;
+let vIndex = -1, vURL = null;
+
+const $ = id => document.getElementById(id);
+const grid = $("grid");
+
+/* ============ helpers ============ */
+const fmtSize = b => b < 1024 ? b + " B"
+  : b < 1048576 ? (b/1024).toFixed(0) + " KB"
+  : (b/1048576).toFixed(1) + " MB";
+
+let toastTimer;
+function toast(msg, ms = 1800){
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  if(ms) toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+const hideToast = () => $("toast").classList.remove("show");
+
+/* animated-WebP detection: RIFF container, VP8X chunk, ANIMATION flag (0x02) */
+async function probeAnimated(blob, type){
+  if(type === "image/gif") return true;            // assume; harmless
+  try{
+    const b = new Uint8Array(await blob.slice(0, 32).arrayBuffer());
+    const str = (i, n) => String.fromCharCode.apply(null, b.subarray(i, i + n));
+    if(str(0,4) !== "RIFF" || str(8,4) !== "WEBP") return false;
+    if(str(12,4) !== "VP8X") return false;
+    return (b[20] & 0x02) !== 0;
+  }catch(e){ return false; }
+}
+
+/* first-frame thumbnail so the grid stays calm and cheap */
+function makeThumb(blob){
+  return new Promise(res => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const S = 320;
+      const side = Math.min(img.naturalWidth, img.naturalHeight) || S;
+      const c = document.createElement("canvas");
+      c.width = c.height = S;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img,
+        (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side,
+        0, 0, S, S);
+      const meta = { w: img.naturalWidth, h: img.naturalHeight };
+      c.toBlob(t => { URL.revokeObjectURL(url); res({ thumb: t, ...meta }); }, "image/jpeg", 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res({ thumb: null, w: 0, h: 0 }); };
+    img.src = url;
+  });
+}
+
+/* ============ render ============ */
+function render(){
+  thumbURLs.forEach(u => URL.revokeObjectURL(u));
+  thumbURLs.clear();
+  grid.innerHTML = "";
+
+  $("empty").hidden = items.length > 0;
+  $("count").textContent = items.length ? items.length + "개" : "";
+  $("editBtn").hidden = items.length === 0;
+
+  const frag = document.createDocumentFragment();
+  items.forEach((it, i) => {
+    const b = document.createElement("button");
+    b.className = "tile";
+    b.dataset.i = i;
+    b.setAttribute("aria-pressed", sel.has(it.id) ? "true" : "false");
+
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.alt = it.name;
+    if(it.thumb){
+      const u = URL.createObjectURL(it.thumb);
+      thumbURLs.set(it.id, u);
+      img.src = u;
+    }
+    b.appendChild(img);
+
+    if(it.animated){
+      const d = document.createElement("i");
+      d.className = "dot";
+      b.appendChild(d);
+    }
+    const n = document.createElement("div");
+    n.className = "name"; n.textContent = it.name;
+    b.appendChild(n);
+
+    const ck = document.createElement("div");
+    ck.className = "check";
+    ck.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
+    b.appendChild(ck);
+
+    frag.appendChild(b);
+  });
+  grid.appendChild(frag);
+  syncEditUI();
+}
+
+function syncEditUI(){
+  document.body.classList.toggle("editing", editing);
+  $("editBtn").textContent = editing ? "완료" : "편집";
+  const del = $("deleteBtn");
+  del.hidden = !editing;
+  del.disabled = sel.size === 0;
+  del.textContent = sel.size ? `삭제 ${sel.size}` : "삭제";
+  $("addBtn").style.display = editing ? "none" : "flex";
+}
+
+/* ============ import ============ */
+async function importFiles(fileList){
+  const files = Array.from(fileList);
+  if(!files.length) return;
+  let added = 0, skipped = 0;
+
+  for(let i = 0; i < files.length; i++){
+    const f = files[i];
+    toast(`담는 중 ${i + 1}/${files.length}`, 0);
+    if(!/^image\//.test(f.type) && !/\.(webp|gif|avif|apng|png)$/i.test(f.name)){ skipped++; continue; }
+    try{
+      const blob = f.slice(0, f.size, f.type || "image/webp");
+      const [{ thumb, w, h }, animated] = await Promise.all([
+        makeThumb(blob),
+        probeAnimated(blob, f.type)
+      ]);
+      const rec = {
+        id: (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random()),
+        name: f.name, size: f.size, type: f.type || "image/webp",
+        addedAt: Date.now() + i, w, h, animated, blob, thumb
+      };
+      await dbPut(rec);
+      items.unshift(rec);
+      added++;
+    }catch(e){
+      skipped++;
+      if(e && (e.name === "QuotaExceededError" || /quota/i.test(String(e)))){
+        toast("저장 공간이 가득 찼어요. 일부만 담겼습니다.", 3200);
+        break;
+      }
+    }
+  }
+  render();
+  hideToast();
+  toast(skipped ? `${added}개 담김 · ${skipped}개 건너뜀` : `${added}개 담김`);
+}
+
+/* ============ viewer ============ */
+function openViewer(i){
+  vIndex = i;
+  $("viewer").classList.add("open");
+  $("viewer").classList.remove("hidechrome");
+  showCurrent();
+}
+function showCurrent(){
+  const it = items[vIndex];
+  if(!it) return closeViewer();
+  if(vURL) URL.revokeObjectURL(vURL);
+  vURL = URL.createObjectURL(it.blob);       // fresh URL = animation restarts from frame 1
+  $("vimg").src = vURL;
+  $("vimg").alt = it.name;
+  $("vname").textContent = it.name;
+  $("vsub").textContent =
+    [(it.w && it.h) ? `${it.w}×${it.h}` : null, fmtSize(it.size), it.animated ? "움직임" : null]
+    .filter(Boolean).join(" · ") + `  ·  ${vIndex + 1}/${items.length}`;
+}
+function step(d){
+  if(!items.length) return;
+  vIndex = (vIndex + d + items.length) % items.length;
+  showCurrent();
+}
+function closeViewer(){
+  $("viewer").classList.remove("open");
+  $("vimg").removeAttribute("src");
+  if(vURL){ URL.revokeObjectURL(vURL); vURL = null; }
+  vIndex = -1;
+}
+
+/* ============ sheets ============ */
+function openSheet(html){
+  $("sheetCard").innerHTML = html;
+  $("sheet").classList.add("open");
+}
+const closeSheet = () => $("sheet").classList.remove("open");
+
+async function showInfo(){
+  let used = "—", quota = "—";
+  try{
+    const est = await navigator.storage.estimate();
+    if(est.usage != null)  used  = fmtSize(est.usage);
+    if(est.quota != null)  quota = fmtSize(est.quota);
+  }catch(e){}
+  const anim = items.filter(i => i.animated).length;
+  openSheet(`
+    <h3>서랍 정보</h3>
+    <div class="kv"><span>담긴 파일</span><span>${items.length}개</span></div>
+    <div class="kv"><span>움직이는 파일</span><span>${anim}개</span></div>
+    <div class="kv"><span>사용 중인 저장 공간</span><span>${used}</span></div>
+    <div class="kv"><span>사용 가능 한도</span><span>${quota}</span></div>
+    <p style="margin-top:16px">파일은 이 기기 안에만 저장되고 어디로도 전송되지 않습니다. Safari 방문 기록·데이터를 지우면 서랍도 함께 비워집니다.</p>
+    <div class="row">
+      <button class="cancel" data-act="close">닫기</button>
+      <button class="confirm" data-act="wipe">전체 비우기</button>
+    </div>`);
+}
+
+/* ============ events ============ */
+$("addBtn").addEventListener("click", () => $("picker").click());
+$("picker").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
+
+$("editBtn").addEventListener("click", () => {
+  editing = !editing;
+  if(!editing) sel.clear();
+  render();
+});
+
+grid.addEventListener("click", e => {
+  const tile = e.target.closest(".tile");
+  if(!tile) return;
+  const i = +tile.dataset.i, it = items[i];
+  if(editing){
+    if(sel.has(it.id)) sel.delete(it.id); else sel.add(it.id);
+    tile.setAttribute("aria-pressed", sel.has(it.id) ? "true" : "false");
+    syncEditUI();
+  }else{
+    openViewer(i);
+  }
+});
+
+$("deleteBtn").addEventListener("click", () => {
+  openSheet(`
+    <h3>${sel.size}개를 삭제할까요?</h3>
+    <p>서랍에서 지워집니다. 원본 파일이 파일앱에 남아 있다면 다시 담을 수 있어요.</p>
+    <div class="row">
+      <button class="cancel" data-act="close">취소</button>
+      <button class="confirm" data-act="del">삭제</button>
+    </div>`);
+});
+
+$("sheet").addEventListener("click", async e => {
+  if(e.target.id === "sheet") return closeSheet();
+  const act = e.target.dataset && e.target.dataset.act;
+  if(!act) return;
+  if(act === "close") return closeSheet();
+  if(act === "del"){
+    for(const id of sel) await dbDelete(id);
+    items = items.filter(i => !sel.has(i.id));
+    sel.clear(); editing = false;
+    closeSheet(); render(); toast("삭제했습니다");
+  }
+  if(act === "wipe"){
+    for(const it of items) await dbDelete(it.id);
+    items = []; sel.clear(); editing = false;
+    closeSheet(); render(); toast("서랍을 비웠습니다");
+  }
+});
+$("infoBtn").addEventListener("click", showInfo);
+
+/* viewer controls */
+$("closeBtn").addEventListener("click", closeViewer);
+$("prevBtn").addEventListener("click", () => step(-1));
+$("nextBtn").addEventListener("click", () => step(1));
+$("navPrev").addEventListener("click", () => step(-1));
+$("navNext").addEventListener("click", () => step(1));
+$("replayBtn").addEventListener("click", showCurrent);
+$("vimg").addEventListener("click", () => $("viewer").classList.toggle("hidechrome"));
+
+$("shareBtn").addEventListener("click", async () => {
+  const it = items[vIndex];
+  if(!it) return;
+  const file = new File([it.blob], it.name, { type: it.type });
+  try{
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file] });
+    }else{
+      toast("이 브라우저에서는 공유를 지원하지 않아요");
+    }
+  }catch(e){}
+});
+
+/* swipe */
+let sx = 0, sy = 0, moved = false;
+$("stage").addEventListener("touchstart", e => {
+  const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; moved = false;
+}, { passive: true });
+$("stage").addEventListener("touchend", e => {
+  const t = e.changedTouches[0];
+  const dx = t.clientX - sx, dy = t.clientY - sy;
+  if(Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4){ step(dx < 0 ? 1 : -1); moved = true; }
+  else if(dy > 90 && Math.abs(dy) > Math.abs(dx) * 1.4){ closeViewer(); moved = true; }
+}, { passive: true });
+
+document.addEventListener("keydown", e => {
+  if(!$("viewer").classList.contains("open")) return;
+  if(e.key === "Escape") closeViewer();
+  if(e.key === "ArrowRight") step(1);
+  if(e.key === "ArrowLeft") step(-1);
+});
+
+/* desktop drag & drop */
+["dragover","drop"].forEach(t => document.addEventListener(t, e => {
+  e.preventDefault();
+  if(t === "drop" && e.dataTransfer && e.dataTransfer.files.length) importFiles(e.dataTransfer.files);
+}));
+
+/* ============ boot ============ */
+(async function init(){
+  try{
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    const all = await dbAll();
+    items = all.sort((a, b) => b.addedAt - a.addedAt);
+  }catch(e){
+    toast("저장소를 열 수 없습니다. 프라이빗 브라우징 창인지 확인해 주세요.", 4000);
+  }
+  render();
+})();
+</script>
+</body>
+</html>
