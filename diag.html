@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>움짤 진단</title>
+<style>
+  body{margin:0;padding:16px;background:#0E0E10;color:#EDEBE6;
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif}
+  h1{font-size:17px;margin:0 0 4px}
+  p.lead{color:#8A8A93;font-size:13px;margin:0 0 16px}
+  button{font:inherit;color:#0E0E10;background:#EDEBE6;border:0;border-radius:12px;
+         padding:12px 18px;font-weight:600}
+  button.sec{background:#202025;color:#EDEBE6;border:1px solid rgba(255,255,255,.12)}
+  #out{white-space:pre-wrap;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+       background:#17171A;border:1px solid rgba(255,255,255,.09);border-radius:12px;
+       padding:14px;margin-top:16px;overflow-x:auto}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  #stage{margin-top:12px}
+  #stage img{max-width:140px;max-height:140px;display:block}
+</style>
+</head>
+<body>
+<h1>움짤 재생 진단</h1>
+<p class="lead">문제가 되는 WebP 파일을 고르면 이 기기에서 무엇이 느린지 측정합니다. 끝나면 결과를 복사해서 보내주세요.</p>
+<div class="row">
+  <button id="pick">파일 고르기</button>
+  <button id="copy" class="sec" hidden>결과 복사</button>
+</div>
+<input type="file" id="f" accept="image/webp,.webp" hidden>
+<div id="stage"></div>
+<div id="out">대기 중…</div>
+
+<script>
+"use strict";
+const out = document.getElementById("out");
+let log = "";
+const say = s => { log += s + "\n"; out.textContent = log; };
+const ms = v => v.toFixed(1) + "ms";
+const stat = a => {
+  const s = [...a].sort((x, y) => x - y);
+  return { mean: a.reduce((x, y) => x + y, 0) / a.length, med: s[s.length >> 1], max: s[s.length - 1] };
+};
+const report = (name, a) => { const t = stat(a); say(`    ${name}: 평균 ${ms(t.mean)} · 중앙 ${ms(t.med)} · 최악 ${ms(t.max)}`); };
+
+/* ---- same demuxer as index.html ---- */
+function parseWebPAnim(buf){
+  const b = new Uint8Array(buf), dv = new DataView(buf);
+  const fourcc = o => String.fromCharCode(b[o], b[o+1], b[o+2], b[o+3]);
+  const u24 = o => b[o] | (b[o+1] << 8) | (b[o+2] << 16);
+  if(fourcc(0) !== "RIFF" || fourcc(8) !== "WEBP") return null;
+  let canvasW = 0, canvasH = 0, loopCount = 0, isAnim = false;
+  const frames = [];
+  let p = 12;
+  while(p + 8 <= b.length){
+    const id = fourcc(p), size = dv.getUint32(p + 4, true), body = p + 8;
+    if(size > b.length - body) break;
+    if(id === "VP8X"){ isAnim = (b[body] & 0x02) !== 0; canvasW = u24(body+4)+1; canvasH = u24(body+7)+1; }
+    else if(id === "ANIM"){ loopCount = dv.getUint16(body + 4, true); }
+    else if(id === "ANMF" && size >= 16){
+      frames.push({ x:u24(body)*2, y:u24(body+3)*2, w:u24(body+6)+1, h:u24(body+9)+1,
+        dur:u24(body+12), blend:(b[body+15]&0x02)===0, dispose:(b[body+15]&0x01)!==0,
+        bytes: b.subarray(body+16, body+size) });
+    }
+    p = body + size + (size & 1);
+  }
+  return { canvasW, canvasH, loopCount, isAnim, frames };
+}
+function wrapStill(f){
+  const sub = f.bytes;
+  const hasAlpha = String.fromCharCode(sub[0],sub[1],sub[2],sub[3]) === "ALPH";
+  const o = new Uint8Array(30 + sub.length), dv = new DataView(o.buffer);
+  const put = (a, s) => { for(let i=0;i<s.length;i++) o[a+i] = s.charCodeAt(i); };
+  const p24 = (a, v) => { o[a]=v&255; o[a+1]=(v>>8)&255; o[a+2]=(v>>16)&255; };
+  put(0,"RIFF"); dv.setUint32(4, o.length-8, true); put(8,"WEBP");
+  put(12,"VP8X"); dv.setUint32(16, 10, true);
+  o[20] = hasAlpha ? 0x10 : 0;
+  p24(24, f.w-1); p24(27, f.h-1);
+  o.set(sub, 30);
+  return new Blob([o], { type: "image/webp" });
+}
+
+async function run(file){
+  log = ""; document.getElementById("copy").hidden = true;
+  document.getElementById("stage").innerHTML = "";
+  say("=== 움짤 재생 진단 ===");
+  say(navigator.userAgent);
+  say(`화면 ${innerWidth}x${innerHeight} @${devicePixelRatio}x · 코어 ${navigator.hardwareConcurrency || "?"}` +
+      (navigator.deviceMemory ? ` · RAM ~${navigator.deviceMemory}GB` : ""));
+  say("");
+
+  const buf = await file.arrayBuffer();
+  say(`파일: ${file.name}  ${(file.size/1048576).toFixed(2)} MB`);
+
+  const a = parseWebPAnim(buf);
+  if(!a || !a.frames.length) return say("→ 애니메이션 WebP로 파싱되지 않음. 여기서 중단합니다.");
+
+  const N = a.frames.length;
+  const dursum = a.frames.reduce((s,f) => s + (f.dur < 10 ? 100 : f.dur), 0);
+  const full = a.frames.filter(f => f.w === a.canvasW && f.h === a.canvasH && f.x === 0 && f.y === 0).length;
+  const decoded = a.frames.reduce((s,f) => s + f.w*f.h*4, 0);
+  say(`캔버스 ${a.canvasW}x${a.canvasH} · 프레임 ${N}개 · 총 ${(dursum/1000).toFixed(2)}초 ` +
+      `(평균 ${(dursum/N).toFixed(0)}ms/프레임 = ${(1000/(dursum/N)).toFixed(1)}fps)`);
+  say(`전체 캔버스 프레임 ${full}/${N} · 부분 사각형 ${N-full}/${N}` +
+      `  ← 부분이 많을수록 프레임 간 의존이 강함`);
+  say(`dispose 사용 ${a.frames.filter(f=>f.dispose).length} · blend 사용 ${a.frames.filter(f=>f.blend).length}`);
+  say(`전 프레임 디코드 시 ${(decoded/1048576).toFixed(0)} MB` +
+      `  → 현재 앱은 ${decoded <= 96*1048576 ? "전량 선디코드" : "링 버퍼"} 경로 사용`);
+  say("");
+
+  const SAMPLE = Math.min(24, N);
+
+  // 1) createImageBitmap — what the current player uses
+  say(`[1] createImageBitmap (현재 플레이어가 쓰는 방식), ${SAMPLE}프레임`);
+  try{
+    const t = [];
+    for(let i = 0; i < SAMPLE; i++){
+      const blob = wrapStill(a.frames[i]);
+      const t0 = performance.now();
+      const bm = await createImageBitmap(blob);
+      t.push(performance.now() - t0);
+      bm.close();
+    }
+    report("디코드", t);
+    const need = dursum / N;
+    say(`    프레임 예산 ${need.toFixed(0)}ms 대비 ${stat(t).mean > need ? "★ 초과 — 여기가 병목" : "여유 있음"}`);
+  }catch(e){ say("    실패: " + e); }
+  say("");
+
+  // 2) createImageBitmap at reduced resolution
+  say("[2] createImageBitmap + 축소 디코드 (resizeWidth)");
+  try{
+    const f0 = a.frames[0];
+    const rw = Math.max(1, Math.round(f0.w / 2)), rh = Math.max(1, Math.round(f0.h / 2));
+    const t = [];
+    for(let i = 0; i < SAMPLE; i++){
+      const blob = wrapStill(a.frames[i]);
+      const t0 = performance.now();
+      const bm = await createImageBitmap(blob, { resizeWidth: rw, resizeHeight: rh, resizeQuality: "low" });
+      t.push(performance.now() - t0);
+      bm.close();
+    }
+    report(`절반 크기(${rw}x${rh})`, t);
+  }catch(e){ say("    미지원/실패: " + e); }
+  say("");
+
+  // 3) HTMLImageElement decode — reportedly faster than createImageBitmap on Safari
+  say("[3] HTMLImageElement.decode() (Safari에서 더 빠르다는 보고)");
+  try{
+    const t = [];
+    for(let i = 0; i < SAMPLE; i++){
+      const url = URL.createObjectURL(wrapStill(a.frames[i]));
+      const im = new Image(); im.src = url;
+      const t0 = performance.now();
+      await im.decode();
+      t.push(performance.now() - t0);
+      URL.revokeObjectURL(url);
+    }
+    report("디코드", t);
+  }catch(e){ say("    실패: " + e); }
+  say("");
+
+  // 4) WebCodecs ImageDecoder — native path, Safari 26+
+  say("[4] WebCodecs ImageDecoder (Safari 26+ 네이티브 경로)");
+  if(typeof ImageDecoder === "undefined") say("    이 기기에서는 사용 불가 ← 지원되면 가장 유력한 해법");
+  else{
+    try{
+      const dec = new ImageDecoder({ data: buf, type: "image/webp" });
+      await dec.tracks.ready;
+      const track = dec.tracks.selectedTrack;
+      say(`    사용 가능 · 트랙 프레임수 ${track ? track.frameCount : "?"} · 애니메이션 ${track ? track.animated : "?"}`);
+      const t = [];
+      for(let i = 0; i < SAMPLE; i++){
+        const t0 = performance.now();
+        const r = await dec.decode({ frameIndex: i });
+        t.push(performance.now() - t0);
+        r.image.close();
+      }
+      report("디코드", t);
+      say("    ※ 이 값이 [1]보다 뚜렷하게 작으면 ImageDecoder로 갈아타는 게 정답입니다.");
+    }catch(e){ say("    실패: " + e); }
+  }
+  say("");
+
+  // 5) canvas blit cost alone, no decoding
+  say("[5] 디코드 제외, 캔버스 합성 비용만");
+  try{
+    const c = document.createElement("canvas");
+    c.width = a.canvasW; c.height = a.canvasH;
+    const cx = c.getContext("2d");
+    const bm = await createImageBitmap(wrapStill(a.frames[0]));
+    const t = [];
+    for(let i = 0; i < 60; i++){
+      const t0 = performance.now();
+      cx.drawImage(bm, a.frames[0].x, a.frames[0].y);
+      t.push(performance.now() - t0);
+    }
+    bm.close();
+    report("drawImage", t);
+    say("    (이 값이 크면 캔버스 해상도 자체가 문제 — 축소 합성이 필요)");
+  }catch(e){ say("    실패: " + e); }
+  say("");
+
+  // 6) native <img> playback rate actually achieved
+  say("[6] 네이티브 <img> 실제 재생 속도 (4초 측정)");
+  await new Promise(done => {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.src = url;
+    document.getElementById("stage").appendChild(im);
+    im.decode().catch(()=>{}).then(() => {
+      const c = document.createElement("canvas"); c.width = c.height = 8;
+      const cx = c.getContext("2d", { willReadFrequently: true });
+      let prev = null, changes = 0, first = null, last = null;
+      const t0 = performance.now();
+      (function loop(){
+        try{
+          cx.drawImage(im, im.naturalWidth >> 1, im.naturalHeight >> 1, 4, 4, 0, 0, 4, 4);
+          const d = cx.getImageData(0, 0, 4, 4).data;
+          let h = 0;
+          for(let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i+1] * 7 + d[i+2] * 13) | 0;
+          if(prev !== null && h !== prev){ changes++; last = performance.now(); if(first === null) first = last; }
+          prev = h;
+        }catch(e){}
+        if(performance.now() - t0 < 4000) requestAnimationFrame(loop);
+        else{
+          if(changes < 2) say("    측정 불가 (이 브라우저에서는 drawImage로 프레임 변화를 못 읽음)");
+          else{
+            const fps = (changes - 1) / ((last - first) / 1000);
+            say(`    관측 프레임 전환 ${changes}회 · 체감 ${fps.toFixed(1)}fps ` +
+                `(파일 선언값 ${(1000/(dursum/N)).toFixed(1)}fps)`);
+            say(`    → 선언값의 ${(fps / (1000/(dursum/N)) * 100).toFixed(0)}% 속도로 재생 중`);
+          }
+          URL.revokeObjectURL(url);
+          done();
+        }
+      })();
+    });
+  });
+
+  say("");
+  say("=== 끝 ===");
+  document.getElementById("copy").hidden = false;
+}
+
+document.getElementById("pick").onclick = () => document.getElementById("f").click();
+document.getElementById("f").onchange = e => { if(e.target.files[0]) run(e.target.files[0]); e.target.value = ""; };
+document.getElementById("copy").onclick = async () => {
+  try{ await navigator.clipboard.writeText(log); document.getElementById("copy").textContent = "복사됨"; }
+  catch(e){ document.getElementById("copy").textContent = "복사 실패 — 직접 선택하세요"; }
+};
+</script>
+</body>
+</html>

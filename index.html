@@ -555,6 +555,104 @@ function createPlayer(canvas, anim){
            get frameIndex(){ return drawn; }, frameCount: frames.length, precache };
 }
 
+/* --- preferred backend: the platform's own decoder (WebCodecs ImageDecoder).
+ * It returns fully composited frames, so there is nothing for us to blend and,
+ * unlike our sub-frame compositor, the result can be downscaled without leaving
+ * seams at rectangle edges. createImageBitmap is measurably slower on Safari,
+ * which is why this path is tried first. --- */
+const canDecode = typeof ImageDecoder === "function";
+
+async function createDecoderPlayer(canvas, buf, anim){
+  if(!canDecode) return null;
+  let dec;
+  try{
+    if(ImageDecoder.isTypeSupported && !(await ImageDecoder.isTypeSupported("image/webp"))) return null;
+    dec = new ImageDecoder({ data: buf, type: "image/webp" });
+    await dec.tracks.ready;
+  }catch(e){ return null; }
+  const track = dec.tracks && dec.tracks.selectedTrack;
+  if(!track || !track.animated || track.frameCount < 2){ try{ dec.close(); }catch(e){} return null; }
+
+  const count = track.frameCount;
+  // Complete frames mean we can render at display size instead of native size —
+  // far less to push per frame on a phone.
+  const cap = Math.max(1, Math.min(
+    anim.canvasW,
+    Math.round(Math.max(screen.width, screen.height) * Math.min(devicePixelRatio || 1, 3))));
+  const scale = Math.min(1, cap / anim.canvasW);
+  canvas.width  = Math.max(1, Math.round(anim.canvasW * scale));
+  canvas.height = Math.max(1, Math.round(anim.canvasH * scale));
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  let raf = 0, dead = false, done = false, i = 0, loops = 0, due = 0, drawn = -1;
+  let ahead = null, aheadIndex = -1;
+  const loopCount = anim.loopCount || track.repetitionCount || 0;
+  const fallbackDur = n => (anim.frames[n] && anim.frames[n].dur >= 10) ? anim.frames[n].dur : 100;
+
+  function grab(n){
+    if(n >= count) return null;
+    return dec.decode({ frameIndex: n }).then(r => r.image, () => null);
+  }
+  function prefetch(n){
+    if(aheadIndex === n) return;
+    if(ahead){ ahead.then(f => f && f.close(), () => {}); }
+    aheadIndex = n; ahead = grab(n);
+  }
+
+  async function show(n){
+    let p;
+    if(aheadIndex === n){ p = ahead; ahead = null; aheadIndex = -1; }
+    else p = grab(n);
+    const frame = await p;
+    if(dead || !frame) return 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);   // frames carry alpha
+    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+    const d = frame.duration ? frame.duration / 1000 : fallbackDur(n);
+    frame.close();
+    drawn = n;
+    prefetch(n + 1 < count ? n + 1 : 0);
+    return d < 10 ? 100 : d;
+  }
+
+  let busy = false;
+  async function tick(now){
+    raf = 0;
+    if(dead || busy) { if(!dead) raf = requestAnimationFrame(tick); return; }
+    if(now >= due){
+      busy = true;
+      const d = await show(i);
+      busy = false;
+      if(dead) return;
+      due = now + d;
+      i++;
+      if(i >= count){
+        loops++;
+        if(loopCount && loops >= loopCount){ done = true; return; }
+        i = 0;
+      }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function play(){ if(dead || done || raf) return; due = 0; raf = requestAnimationFrame(tick); }
+  function pause(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
+
+  return {
+    backend: "ImageDecoder",
+    precache: false,
+    frameCount: count,
+    get frameIndex(){ return drawn; },
+    async start(){ prefetch(0); play(); },
+    play, pause,
+    replay(){ pause(); i = 0; loops = 0; done = false; play(); },
+    destroy(){
+      dead = true; pause();
+      if(ahead) ahead.then(f => f && f.close(), () => {});
+      try{ dec.close(); }catch(e){}
+    }
+  };
+}
+
 /* ============ render ============ */
 function render(){
   thumbURLs.forEach(u => URL.revokeObjectURL(u));
@@ -687,17 +785,20 @@ async function showCurrent(){
 
   // Materialize the bytes once, up front: an IndexedDB-backed blob is read lazily,
   // which would otherwise put disk I/O inside the decode path.
-  let anim = null;
-  if(canPlay && /webp/i.test(it.type || "")){
+  let anim = null, buf = null;
+  if((canPlay || canDecode) && /webp/i.test(it.type || "")){
     try{
-      const buf = await blob.arrayBuffer();
+      buf = await blob.arrayBuffer();
       if(token !== vToken) return;
       anim = parseWebPAnim(buf);
     }catch(e){}
   }
 
   if(anim){
-    const p = createPlayer($("vcanvas"), anim);
+    let p = null;
+    try{ p = await createDecoderPlayer($("vcanvas"), buf, anim); }catch(e){}
+    if(token !== vToken){ if(p) p.destroy(); return; }
+    if(!p) p = createPlayer($("vcanvas"), anim);   // fallback: our own compositor
     player = p;
     $("vimg").hidden = true;
     $("vcanvas").hidden = false;
