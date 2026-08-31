@@ -373,18 +373,29 @@ function makeThumb(blob){
 }
 
 /* ============ animated WebP player ============ *
- * Native <img> playback of an animated WebP degrades as it advances: most ANMF
- * frames are small rectangles blended onto the previous canvas state, so frame N
- * needs frames 0..N. The browser absorbs that with a decoded-frame cache, but a
- * 1080x1080 animation costs ~4.6 MB per decoded frame, so the cache is blown
- * early and later frames get re-decoded from frame 0 — cost grows with N, which
- * is why playback is smooth at the start and stutters near the end.
+ * Native <img> playback of a large animated WebP degrades as it advances, for
+ * either of two reasons:
  *
- * We take frame timing away from the browser instead. Sub-frames are decoded
- * individually and composited forward-only onto one persistent canvas, so the
- * cost of a frame is O(1) regardless of its index.
+ *   1. Decoded footprint. A frame costs width*height*4 bytes decoded, so a
+ *      720x686 animation of 121 frames is 228 MB. That does not fit in the
+ *      browser's decoded-frame cache on a phone, so it thrashes: decode, evict,
+ *      re-decode. Measured on an iPhone (iOS 18.7 / Safari 26.5.2), this is what
+ *      actually stalls playback — not slow decoding. A single frame decodes in
+ *      ~10 ms against a 50 ms frame budget.
+ *   2. Dependency chains. Where ANMF frames are sub-rectangles blended onto the
+ *      previous canvas state, frame N needs frames 0..N, so an evicted cache
+ *      makes the cost of a frame grow with its index. Many files have no such
+ *      chain (every frame a full-canvas keyframe) and hit only reason 1.
+ *
+ * Both come down to the browser's frame cache, so we take it over. Frames are
+ * decoded by us and composited forward-only onto one persistent canvas, with
+ * resident frames explicitly bounded. Cost per frame is O(1) in the index, and
+ * memory stays flat no matter how long the animation is.
  */
-const FRAME_CACHE_BUDGET = 96 * 1024 * 1024;   // full-precache ceiling
+// Precaching every frame buys almost nothing when a decode costs ~10 ms, and
+// holding that many ImageBitmaps is exactly the memory pressure we are trying to
+// escape — so the ceiling is deliberately low and most files stream instead.
+const FRAME_CACHE_BUDGET = 24 * 1024 * 1024;
 const PREFETCH = 12;                            // ring-buffer look-ahead
 const canPlay = typeof createImageBitmap === "function";
 
@@ -558,8 +569,11 @@ function createPlayer(canvas, anim){
 /* --- preferred backend: the platform's own decoder (WebCodecs ImageDecoder).
  * It returns fully composited frames, so there is nothing for us to blend and,
  * unlike our sub-frame compositor, the result can be downscaled without leaving
- * seams at rectangle edges. createImageBitmap is measurably slower on Safari,
- * which is why this path is tried first. --- */
+ * seams at rectangle edges — which is why it is tried first.
+ *
+ * It is not here for decode speed: on iOS 18.7 / Safari 26.5.2, createImageBitmap
+ * and HTMLImageElement.decode both measure ~10 ms/frame and ImageDecoder is not
+ * exposed at all, so that platform always lands on the fallback below. --- */
 const canDecode = typeof ImageDecoder === "function";
 
 async function createDecoderPlayer(canvas, buf, anim){
