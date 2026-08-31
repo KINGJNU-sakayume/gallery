@@ -145,10 +145,14 @@
     flex:1;position:relative;display:flex;align-items:center;justify-content:center;
     overflow:hidden;
   }
-  .stage img{
+  .stage img,.stage canvas{
     max-width:100%;max-height:100%;display:block;object-fit:contain;
     -webkit-user-drag:none;
   }
+  .stage img[hidden],.stage canvas[hidden]{display:none}
+  /* while the viewer is up, stop the grid's decoded thumbnails from competing
+     with the animation for the browser's image-memory budget */
+  body.viewing .grid{content-visibility:hidden}
   .vchrome{transition:opacity .2s}
   .viewer.hidechrome .vchrome{opacity:0;pointer-events:none}
   .vtop{
@@ -235,6 +239,7 @@
 <div class="viewer" id="viewer">
   <div class="stage" id="stage">
     <img id="vimg" alt="">
+    <canvas id="vcanvas" hidden></canvas>
     <div class="nav prev" id="navPrev"></div>
     <div class="nav next" id="navNext"></div>
     <div class="vtop vchrome">
@@ -300,15 +305,21 @@ async function tx(mode, fn){
   });
 }
 const dbAll    = () => tx("readonly",  s => { const r = s.getAll(); return new Promise(ok => r.onsuccess = () => ok(r.result)); }).then(p => p);
+const dbGet    = id  => tx("readonly",  s => { const r = s.get(id);  return new Promise(ok => r.onsuccess = () => ok(r.result)); }).then(p => p);
 const dbPut    = rec => tx("readwrite", s => s.put(rec));
 const dbDelete = id  => tx("readwrite", s => s.delete(id));
 
+/* originals are fetched on demand, never kept resident in `items` */
+const meta = rec => { const { blob, ...m } = rec; return m; };
+const blobOf = async it => (await dbGet(it.id) || {}).blob;
+
 /* ============ state ============ */
-let items = [];                 // {id,name,size,type,addedAt,w,h,animated,blob,thumb}
+let items = [];                 // {id,name,size,type,addedAt,w,h,animated,thumb} — no blob
 const thumbURLs = new Map();
 const sel = new Set();
 let editing = false;
 let vIndex = -1, vURL = null;
+let player = null, vToken = 0;
 
 const $ = id => document.getElementById(id);
 const grid = $("grid");
@@ -359,6 +370,189 @@ function makeThumb(blob){
     img.onerror = () => { URL.revokeObjectURL(url); res({ thumb: null, w: 0, h: 0 }); };
     img.src = url;
   });
+}
+
+/* ============ animated WebP player ============ *
+ * Native <img> playback of an animated WebP degrades as it advances: most ANMF
+ * frames are small rectangles blended onto the previous canvas state, so frame N
+ * needs frames 0..N. The browser absorbs that with a decoded-frame cache, but a
+ * 1080x1080 animation costs ~4.6 MB per decoded frame, so the cache is blown
+ * early and later frames get re-decoded from frame 0 — cost grows with N, which
+ * is why playback is smooth at the start and stutters near the end.
+ *
+ * We take frame timing away from the browser instead. Sub-frames are decoded
+ * individually and composited forward-only onto one persistent canvas, so the
+ * cost of a frame is O(1) regardless of its index.
+ */
+const FRAME_CACHE_BUDGET = 96 * 1024 * 1024;   // full-precache ceiling
+const PREFETCH = 12;                            // ring-buffer look-ahead
+const canPlay = typeof createImageBitmap === "function";
+
+/* --- demuxer: walk RIFF chunks, collect ANMF frames --- */
+function parseWebPAnim(buf){
+  try{
+    const b = new Uint8Array(buf), dv = new DataView(buf);
+    const fourcc = o => String.fromCharCode(b[o], b[o+1], b[o+2], b[o+3]);
+    const u24 = o => b[o] | (b[o+1] << 8) | (b[o+2] << 16);
+    if(b.length < 21 || fourcc(0) !== "RIFF" || fourcc(8) !== "WEBP") return null;
+
+    let canvasW = 0, canvasH = 0, loopCount = 0, isAnim = false;
+    const frames = [];
+
+    // chunk = fourcc(4) + size(4, LE) + payload, padded to an even length.
+    // Do not assume chunk order — ICCP/EXIF/XMP may sit between the ones we want.
+    let p = 12;
+    while(p + 8 <= b.length){
+      const id = fourcc(p), size = dv.getUint32(p + 4, true), body = p + 8;
+      if(size > b.length - body) break;                 // truncated file
+      if(id === "VP8X"){
+        isAnim  = (b[body] & 0x02) !== 0;
+        canvasW = u24(body + 4) + 1;
+        canvasH = u24(body + 7) + 1;
+      }else if(id === "ANIM"){
+        loopCount = dv.getUint16(body + 4, true);
+      }else if(id === "ANMF" && size >= 16){
+        frames.push({
+          x: u24(body) * 2, y: u24(body + 3) * 2,
+          w: u24(body + 6) + 1, h: u24(body + 9) + 1,
+          dur: u24(body + 12),
+          blend:   (b[body + 15] & 0x02) === 0,          // bit set = do NOT blend
+          dispose: (b[body + 15] & 0x01) !== 0,          // bit set = clear to background
+          bytes: b.subarray(body + 16, body + size)      // frame bitstream sub-chunks
+        });
+      }
+      p = body + size + (size & 1);
+    }
+    if(!isAnim || frames.length < 2 || !canvasW || !canvasH) return null;
+    return { canvasW, canvasH, loopCount, frames };
+  }catch(e){ return null; }
+}
+
+/* --- one ANMF sub-frame -> ImageBitmap, by re-wrapping it as a still WebP --- */
+function decodeSubFrame(f){
+  const sub = f.bytes;
+  const hasAlpha = String.fromCharCode(sub[0], sub[1], sub[2], sub[3]) === "ALPH";
+  const out = new Uint8Array(12 + 8 + 10 + sub.length);
+  const dv = new DataView(out.buffer);
+  const put = (o, s) => { for(let i = 0; i < s.length; i++) out[o + i] = s.charCodeAt(i); };
+  const put24 = (o, v) => { out[o] = v & 255; out[o+1] = (v >> 8) & 255; out[o+2] = (v >> 16) & 255; };
+
+  put(0, "RIFF");  dv.setUint32(4, out.length - 8, true);  put(8, "WEBP");
+  put(12, "VP8X"); dv.setUint32(16, 10, true);
+  out[20] = hasAlpha ? 0x10 : 0;                  // flags: ALPHA only, never ANIMATION
+  put24(24, f.w - 1); put24(27, f.h - 1);
+  out.set(sub, 30);
+
+  return createImageBitmap(new Blob([out], { type: "image/webp" }));
+}
+
+/* --- player: forward-only incremental compositing --- */
+function createPlayer(canvas, anim){
+  const ctx = canvas.getContext("2d", { alpha: true });
+  const { frames, canvasW, canvasH } = anim;
+  // Composite at native resolution and let CSS scale the element down. Compositing
+  // downscaled would leave half-pixel seams along sub-frame rectangle edges.
+  canvas.width = canvasW; canvas.height = canvasH;
+
+  const bitmaps = new Map();     // index -> ImageBitmap
+  const pending = new Map();     // index -> Promise
+  let raf = 0, dead = false, done = false, i = 0, loops = 0, drawn = -1, due = 0;
+
+  const total = frames.reduce((n, f) => n + f.w * f.h * 4, 0);
+  const precache = total <= FRAME_CACHE_BUDGET;
+  // The spec allows 0; browsers treat near-zero durations as 100ms.
+  const dur = n => frames[n].dur < 10 ? 100 : frames[n].dur;
+
+  function want(n){
+    if(n >= frames.length || bitmaps.has(n) || pending.has(n)) return;
+    const p = decodeSubFrame(frames[n]).then(bm => {
+      pending.delete(n);
+      if(dead) bm.close(); else bitmaps.set(n, bm);
+      return bm;
+    }, () => { pending.delete(n); });
+    pending.set(n, p);
+  }
+
+  function compose(n){
+    const f = frames[n], bm = bitmaps.get(n);
+    if(!bm) return false;
+    // Dispose acts on the PREVIOUS frame's rectangle, before this one is drawn.
+    if(n > 0){
+      const q = frames[n - 1];
+      if(q.dispose) ctx.clearRect(q.x, q.y, q.w, q.h);
+    }
+    if(!f.blend) ctx.clearRect(f.x, f.y, f.w, f.h);   // overwrite instead of blending
+    ctx.drawImage(bm, f.x, f.y);
+    drawn = n;
+    if(!precache){
+      bm.close(); bitmaps.delete(n);
+      for(let k = n + 1; k <= n + PREFETCH; k++) want(k);
+    }
+    return true;
+  }
+
+  function tick(now){
+    raf = 0;
+    if(dead) return;
+    // Behind schedule: compose every missed frame rather than skipping. The canvas
+    // is incremental, so a skipped frame would corrupt everything after it.
+    while(i < frames.length && now >= due){
+      if(!compose(i)) break;                          // not decoded yet — hold
+      due += dur(i);
+      i++;
+      if(i >= frames.length){
+        loops++;
+        if(anim.loopCount && loops >= anim.loopCount){ done = true; return; }
+        // loop around without touching `due` — it already holds the last frame's
+        // end time, so the final frame gets its full duration
+        rewind();
+      }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function rewind(){
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    i = 0; drawn = -1;
+    if(!precache) for(let k = 0; k < PREFETCH; k++) want(k);
+  }
+
+  function play(){
+    if(dead || done || raf) return;
+    due = performance.now();
+    raf = requestAnimationFrame(tick);
+  }
+  function pause(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
+
+  async function start(){
+    if(precache){
+      const all = frames.map((_, n) => { want(n); return pending.get(n); });
+      await Promise.all(all);
+    }else{
+      for(let k = 0; k < PREFETCH; k++) want(k);
+      await pending.get(0);
+    }
+    if(dead) return;
+    due = performance.now();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function destroy(){
+    dead = true;
+    pause();
+    bitmaps.forEach(bm => bm.close());
+    bitmaps.clear(); pending.clear();
+  }
+
+  function replay(){
+    pause();
+    rewind();
+    loops = 0; done = false;
+    play();
+  }
+
+  return { start, play, pause, destroy, replay,
+           get frameIndex(){ return drawn; }, frameCount: frames.length, precache };
 }
 
 /* ============ render ============ */
@@ -441,7 +635,7 @@ async function importFiles(fileList){
         addedAt: Date.now() + i, w, h, animated, blob, thumb
       };
       await dbPut(rec);
-      items.unshift(rec);
+      items.unshift(meta(rec));        // keep metadata resident, not the original
       added++;
     }catch(e){
       skipped++;
@@ -461,29 +655,81 @@ function openViewer(i){
   vIndex = i;
   $("viewer").classList.add("open");
   $("viewer").classList.remove("hidechrome");
+  document.body.classList.add("viewing");
   showCurrent();
 }
-function showCurrent(){
+
+/* tear the current media down; every path out of a frame goes through here */
+function teardown(){
+  if(player){ player.destroy(); player = null; }
+  $("vcanvas").hidden = true;
+  $("vimg").hidden = false;
+  $("vimg").removeAttribute("src");
+  if(vURL){ URL.revokeObjectURL(vURL); vURL = null; }
+}
+
+async function showCurrent(){
   const it = items[vIndex];
   if(!it) return closeViewer();
-  if(vURL) URL.revokeObjectURL(vURL);
-  vURL = URL.createObjectURL(it.blob);       // fresh URL = animation restarts from frame 1
-  $("vimg").src = vURL;
+  const token = ++vToken;                    // stale-load guard for fast swiping
+  teardown();
+
   $("vimg").alt = it.name;
   $("vname").textContent = it.name;
   $("vsub").textContent =
     [(it.w && it.h) ? `${it.w}×${it.h}` : null, fmtSize(it.size), it.animated ? "움직임" : null]
     .filter(Boolean).join(" · ") + `  ·  ${vIndex + 1}/${items.length}`;
+
+  let blob;
+  try{ blob = await blobOf(it); }catch(e){}
+  if(token !== vToken) return;
+  if(!blob) return toast("파일을 불러오지 못했습니다");
+
+  // Materialize the bytes once, up front: an IndexedDB-backed blob is read lazily,
+  // which would otherwise put disk I/O inside the decode path.
+  let anim = null;
+  if(canPlay && /webp/i.test(it.type || "")){
+    try{
+      const buf = await blob.arrayBuffer();
+      if(token !== vToken) return;
+      anim = parseWebPAnim(buf);
+    }catch(e){}
+  }
+
+  if(anim){
+    const p = createPlayer($("vcanvas"), anim);
+    player = p;
+    $("vimg").hidden = true;
+    $("vcanvas").hidden = false;
+    if(p.precache) toast("준비 중…", 0);
+    try{ await p.start(); }catch(e){}
+    if(token !== vToken){ if(player === p){ p.destroy(); player = null; } return; }
+    if(p.precache) hideToast();
+    return;
+  }
+
+  // fallback: static images, GIF, APNG, or anything we could not demux
+  vURL = URL.createObjectURL(blob);
+  const img = $("vimg");
+  img.src = vURL;
+  try{ await img.decode(); }catch(e){}       // gate the first paint off the main thread
 }
+
 function step(d){
   if(!items.length) return;
   vIndex = (vIndex + d + items.length) % items.length;
   showCurrent();
+  // warm the neighbours' bytes (read only — no decoding)
+  for(const n of [vIndex + 1, vIndex - 1]){
+    const it = items[(n + items.length) % items.length];
+    if(it) blobOf(it).catch(() => {});
+  }
 }
 function closeViewer(){
+  vToken++;
   $("viewer").classList.remove("open");
-  $("vimg").removeAttribute("src");
-  if(vURL){ URL.revokeObjectURL(vURL); vURL = null; }
+  document.body.classList.remove("viewing");
+  teardown();
   vIndex = -1;
 }
 
@@ -573,13 +819,23 @@ $("prevBtn").addEventListener("click", () => step(-1));
 $("nextBtn").addEventListener("click", () => step(1));
 $("navPrev").addEventListener("click", () => step(-1));
 $("navNext").addEventListener("click", () => step(1));
-$("replayBtn").addEventListener("click", showCurrent);
-$("vimg").addEventListener("click", () => $("viewer").classList.toggle("hidechrome"));
+// with the player, replay is a canvas reset — no blob URL churn, no re-decode
+$("replayBtn").addEventListener("click", () => player ? player.replay() : showCurrent());
+const toggleChrome = () => $("viewer").classList.toggle("hidechrome");
+$("vimg").addEventListener("click", toggleChrome);
+$("vcanvas").addEventListener("click", toggleChrome);
+
+document.addEventListener("visibilitychange", () => {
+  if(!player) return;
+  if(document.hidden) player.pause(); else player.play();
+});
 
 $("shareBtn").addEventListener("click", async () => {
   const it = items[vIndex];
   if(!it) return;
-  const file = new File([it.blob], it.name, { type: it.type });
+  const blob = await blobOf(it);
+  if(!blob) return toast("파일을 불러오지 못했습니다");
+  const file = new File([blob], it.name, { type: it.type });
   try{
     if(navigator.canShare && navigator.canShare({ files: [file] })){
       await navigator.share({ files: [file] });
@@ -619,7 +875,7 @@ document.addEventListener("keydown", e => {
   try{
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     const all = await dbAll();
-    items = all.sort((a, b) => b.addedAt - a.addedAt);
+    items = all.map(meta).sort((a, b) => b.addedAt - a.addedAt);
   }catch(e){
     toast("저장소를 열 수 없습니다. 프라이빗 브라우징 창인지 확인해 주세요.", 4000);
   }
